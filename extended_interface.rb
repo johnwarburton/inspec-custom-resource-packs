@@ -8,7 +8,7 @@ class ExtendedNetworkInterface < Inspec.resource(1)
   supports platform: "unix"
   desc "Extend the interface InSpec audit resource to test advanced network adapter properties"
   example <<~EXAMPLE
-    describe interface('eth0') do
+    describe extended_interface('eth0') do
       it { should exist }
       it { should be_up }
       its('mac') { should eq '00:00:de:ad:be:ef' }
