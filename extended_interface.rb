@@ -8,15 +8,18 @@ class ExtendedNetworkInterface < Inspec.resource(1)
   supports platform: "unix"
   desc "Extend the interface InSpec audit resource to test advanced network adapter properties"
   example <<~EXAMPLE
-    describe extended_interface('eth0') do
-      it { should exist }
-      it { should be_up }
-      its('mac') { should eq '00:00:de:ad:be:ef' }
-      its('mtu') { should eq '1420' }
-      its('duplex') { should eq 'full'}
-      its('flags') { should include 'NOARP' }
-    end
+  describe interface('eth0') do
+    it { should exist }
+    it { should be_up }
+    its('mac') { should eq '00:00:de:ad:be:ef' }
+    its('mtu') { should eq '1420' }
+    its('duplex') { should eq 'full'}
+    its('flags') { should include 'NOARP' }
+    its('static_arp') { should eq static_arp_entries[nic] }
+    its('static_arp') { should eq eval('{"ip"=>"10.96.22.206", "mac"=>"00:1c:73:13:50:88"}') }
+  end
   EXAMPLE
+
   def initialize(iface)
     @iface = iface
 
@@ -42,6 +45,10 @@ class ExtendedNetworkInterface < Inspec.resource(1)
 
   def flags
     interface_info[:flags]
+  end
+
+  def static_arp
+    interface_info[:static_arp]
   end
 
   def to_s
@@ -98,14 +105,25 @@ class LinuxInterface < InterfaceInfo
     return nil if cmd.exit_status.to_i != 0
     flags = cmd.stdout.chomp.split(/\s+/).last.gsub(/<|>/, '').split(',')
 
+    #
+    #[root@epcau-lab-srv004:~]# arp -a | grep PERM
+    #? (10.96.22.222) at 00:1c:73:0f:80:c4 [ether] PERM on p7p4
+    #? (10.96.22.206) at 00:1c:73:13:50:88 [ether] PERM on p7p3
+    #
+    static_arp = {}
+    IO.popen('arp -a').readlines.select { |e| /PERM/.match(e) }.each { |line|
+      line = line.split(' ')
+      next if (line[7] != iface)
+      static_arp = { 'ip' => line[1].gsub(/\(|\)/, ''), 'mac' => line[3] }
+    }
+
     return {
       name: iface,
       mac_address: mac_address,
       mtu: mtu,
       duplex: duplex,
       flags: flags,
+      static_arp: static_arp,
     }
   end
-
-  
 end
